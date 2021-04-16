@@ -63,10 +63,10 @@ class OAFilter(nn.Module):
                 nn.ReLU(),
                 nn.Conv2d(out_channels, out_channels, kernel_size=1)
                 )
-    def forward(self, x):
-        out = self.conv1(x)
-        out = out + self.conv2(out)
-        out = self.conv3(out)
+    def forward(self, x):  # [b, c, cluster, 1]
+        out = self.conv1(x)  # [b, cluster, c, 1]
+        out = out + self.conv2(out)  # [b, cluster, c, 1]
+        out = self.conv3(out)  # [b, c, cluster, 1]
         if self.shot_cut:
             out = out + self.shot_cut(x)
         else:
@@ -123,10 +123,10 @@ class diff_pool(nn.Module):
                 nn.ReLU(),
                 nn.Conv2d(in_channel, output_points, kernel_size=1))
         
-    def forward(self, x):
-        embed = self.conv(x)# b*k*n*1
-        S = torch.softmax(embed, dim=2).squeeze(3)
-        out = torch.matmul(x.squeeze(3), S.transpose(1,2)).unsqueeze(3)
+    def forward(self, x):  # [b, c, n, 1]
+        embed = self.conv(x)  # [b, cluster, n, 1]
+        S = torch.softmax(embed, dim=2).squeeze(3)  # [b, cluster, n]
+        out = torch.matmul(x.squeeze(3), S.transpose(1,2)).unsqueeze(3)  # [b, c, cluster, 1]
         return out
 
 class diff_unpool(nn.Module):
@@ -183,17 +183,17 @@ class OANBlock(nn.Module):
         self.output = nn.Conv2d(channels, 1, kernel_size=1)
 
 
-    def forward(self, data, xs):
+    def forward(self, data, xs):  # data[b, c, n, 1], xs[b, 1, n, c]
         #data: b*c*n*1
         batch_size, num_pts = data.shape[0], data.shape[2]
-        x1_1 = self.conv1(data)
-        x1_1 = self.l1_1(x1_1)
-        x_down = self.down1(x1_1)
-        x2 = self.l2(x_down)
-        x_up = self.up1(x1_1, x2)
-        out = self.l1_2( torch.cat([x1_1,x_up], dim=1))
+        x1_1 = self.conv1(data)  # [b, c, n, 1]
+        x1_1 = self.l1_1(x1_1)  # [b, c, n, 1]
+        x_down = self.down1(x1_1)  # [b, c, cluster, 1]
+        x2 = self.l2(x_down)  # [b, c, cluster, 1]
+        x_up = self.up1(x1_1, x2)  # [b, c, n, 1]
+        out = self.l1_2( torch.cat([x1_1,x_up], dim=1))  # [b, c, n, 1]
 
-        logits = torch.squeeze(torch.squeeze(self.output(out),3),1)
+        logits = torch.squeeze(torch.squeeze(self.output(out),3),1)  # [b, n]
         e_hat = weighted_8points(xs, logits)
 
         x1, x2 = xs[:,0,:,:2], xs[:,0,:,2:4]
@@ -218,7 +218,7 @@ class OANet(nn.Module):
         assert data['xs'].dim() == 4 and data['xs'].shape[1] == 1
         batch_size, num_pts = data['xs'].shape[0], data['xs'].shape[2]
         #data: b*1*n*c
-        input = data['xs'].transpose(1,3)
+        input = data['xs'].transpose(1,3)  # [b, c, n, 1]
         if self.side_channel > 0:
             sides = data['sides'].transpose(1,2).unsqueeze(3)
             input = torch.cat([input, sides], dim=1)
