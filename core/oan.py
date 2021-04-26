@@ -251,27 +251,27 @@ def weighted_8points(x_in, logits):
     # x_in: batch * 1 * N * 4
     x_shp = x_in.shape
     # Turn into weights for each sample
-    weights = torch.relu(torch.tanh(logits))
-    x_in = x_in.squeeze(1)
+    weights = torch.relu(torch.tanh(logits))  # [b, p]
+    x_in = x_in.squeeze(1)  # [b, n, 4]
     
     # Make input data (num_img_pair x num_corr x 4)
-    xx = torch.reshape(x_in, (x_shp[0], x_shp[2], 4)).permute(0, 2, 1)
+    xx = torch.reshape(x_in, (x_shp[0], x_shp[2], 4)).permute(0, 2, 1)  # [b, 4, n]
 
     # Create the matrix to be used for the eight-point algorithm
     X = torch.stack([
         xx[:, 2] * xx[:, 0], xx[:, 2] * xx[:, 1], xx[:, 2],
         xx[:, 3] * xx[:, 0], xx[:, 3] * xx[:, 1], xx[:, 3],
         xx[:, 0], xx[:, 1], torch.ones_like(xx[:, 0])
-    ], dim=1).permute(0, 2, 1)
-    wX = torch.reshape(weights, (x_shp[0], x_shp[2], 1)) * X
-    XwX = torch.matmul(X.permute(0, 2, 1), wX)
+    ], dim=1).permute(0, 2, 1)  # [b, n, 9]
+    wX = torch.reshape(weights, (x_shp[0], x_shp[2], 1)) * X  # [b, n, 9]
+    XwX = torch.matmul(X.permute(0, 2, 1), wX)  # [b, 9, 9]
     
 
     # Recover essential matrix from self-adjoing eigen
     v = batch_symeig(XwX)
-    e_hat = torch.reshape(v[:, :, 0], (x_shp[0], 9))
+    e_hat = torch.reshape(v[:, :, 0], (x_shp[0], 9))  # [b, 9]
 
     # Make unit norm just in case
     e_hat = e_hat / torch.norm(e_hat, dim=1, keepdim=True)
-    return e_hat
+    return e_hat  # [b, 9]
 
